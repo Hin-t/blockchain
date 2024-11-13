@@ -13,6 +13,8 @@ type CLI struct {
 // 用法展示
 func PrintUsage() {
 	fmt.Println("Usage:")
+
+	fmt.Println("\tcreatewallet -- 创建钱包")
 	// 初始化区块链
 	fmt.Println("\tcreateblockchain -address address -- 创建区块链")
 	// 添加区块
@@ -47,6 +49,8 @@ func (cli *CLI) Run() {
 	// 新建相关命令
 	// 添加区块
 	addBlockCmd := flag.NewFlagSet("addblock", flag.ExitOnError)
+	// 创建钱包
+	createWalletCmd := flag.NewFlagSet("createwallet", flag.ExitOnError)
 	// 输出区块链完整信息
 	printChainCmd := flag.NewFlagSet("printchain", flag.ExitOnError)
 	// 创建区块链
@@ -67,6 +71,10 @@ func (cli *CLI) Run() {
 
 	// 判断命令
 	switch os.Args[1] {
+	case "createwallet":
+		if err := createWalletCmd.Parse(os.Args[2:]); err != nil {
+			log.Panicf("parse cmd of create wallet failed! %v\n", err)
+		}
 	case "getbalance":
 		if err := getBalanceCmd.Parse(os.Args[2:]); err != nil {
 			log.Panicf("parse getBalanceCmd err: %v", err)
@@ -94,6 +102,9 @@ func (cli *CLI) Run() {
 		os.Exit(1)
 	}
 
+	if createBLCWithGenesisiBlockCmd.Parsed() {
+		cli.CreateWallets()
+	}
 	//查询余额
 	if getBalanceCmd.Parsed() {
 		if *flagGetBalanceArg == "" {

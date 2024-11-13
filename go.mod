@@ -1,6 +1,6 @@
 module blockchain
 
-go 1.18.10
+go 1.18
 
 require (
 	github.com/aead/siphash v1.0.1 // indirect
