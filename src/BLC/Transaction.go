@@ -3,6 +3,7 @@ package BLC
 import (
 	"bytes"
 	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/gob"
@@ -10,6 +11,7 @@ import (
 	"fmt"
 	"log"
 	"math/big"
+	"time"
 )
 
 //交易管理文件
@@ -47,8 +49,12 @@ func (tx *Transaction) HashTransaction() {
 	if err := encoder.Encode(tx); err != nil {
 		log.Panic("tx Hash failed %V\n", err)
 	}
+	//添加时间戳标识，不添加会导致所有coinbase交易哈希完全相同
+	timestamp := time.Now().UnixNano()
+	// 用于生成哈希的原数据
+	txHashBytes := bytes.Join([][]byte{result.Bytes(), Int64ToHex(timestamp)}, []byte{})
 	//生成哈希值
-	hash := sha256.Sum256(result.Bytes())
+	hash := sha256.Sum256(txHashBytes)
 	tx.TxHash = hash[:]
 }
 
@@ -171,7 +177,54 @@ func (tx *Transaction) Serialize() []byte {
 }
 
 // 验证签名
-func (tx *Transaction) Verify() bool {
+func (tx *Transaction) Verify(prevTxs map[string]Transaction) bool {
+	//检查能否找到相应的交易hash
+	for _, vin := range tx.Vins {
+		if prevTxs[hex.EncodeToString(vin.TxHash)].TxHash == nil {
+			log.Panicf("Verify  Error: transaction verify failed!\n")
+		}
+	}
+	// 提取相同的交易签名属性
+	txCopy := tx.TrimmedCopy()
+	// 使用相同的椭圆
+	curve := elliptic.P256()
+	//遍历tx输入，对每笔输入引用的输出进行验证
+	for vin_id, vin := range tx.Vins {
+		// 获取关联交易
+		prevTx := prevTxs[hex.EncodeToString(vin.TxHash)]
+		// 找到发送者（当前输入引用的哈希-输出的哈希）
+		txCopy.Vins[vin_id].TxHash = prevTx.Vouts[vin.Vout].Ripemd160Hash
+		// 由需要验证的数据生成的交易hash，必须要与签名时使用数据完全一致
+		txCopy.TxHash = txCopy.Hash()
+		// 在比特币中，签名是一个数值对，r，s代表签名
+		// 从输入的signature中获取
+		// 获取r，s ，二者长度相等
+		r := big.Int{}
+		s := big.Int{}
+		sigLens := len(vin.Signature)
+		r.SetBytes(vin.Signature[:(sigLens / 2)])
+		s.SetBytes(vin.Signature[(sigLens / 2):])
+		// 获取公钥
+		// 公钥由X，Y组成
+		x := big.Int{}
+		y := big.Int{}
+		pubKeyLen := len(vin.PublicKey)
+		x.SetBytes(vin.PublicKey[:(pubKeyLen / 2)])
+		y.SetBytes(vin.PublicKey[(pubKeyLen / 2):])
+
+		rawPubKey := ecdsa.PublicKey{curve, &x, &y}
+		if !ecdsa.Verify(&rawPubKey, txCopy.TxHash, &r, &s) {
+			return false
+		}
+	}
+	// pub *PublicKey, hash []byte, r, s *big.Int
+	/*
+		// PublicKey represents an ECDSA public key.
+		type PublicKey struct {
+			elliptic.Curve
+			X, Y *big.Int
+		}
+	*/
 	//调用验证签名核心函数
-	return ecdsa.Verify(nil, nil, big.NewInt(0), big.NewInt(0))
+	return true
 }

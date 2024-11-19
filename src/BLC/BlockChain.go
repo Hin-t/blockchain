@@ -203,6 +203,9 @@ func (blockchain *BlockChain) MineNewBlock(from []string, to []string, amount []
 
 		//追加到txs的交易列表中去
 		txs = append(txs, tx)
+		//给予交易的发起者（矿工）一定的奖励
+		tx = NewCoinbaseTransaction(address)
+		txs = append(txs, tx)
 	}
 
 	//从数据库中获取最新一个区块
@@ -222,7 +225,9 @@ func (blockchain *BlockChain) MineNewBlock(from []string, to []string, amount []
 	// 对txs中每一笔交易的签名都进行验证
 	for _, tx := range txs {
 		//只要有一笔交易验证失败。panic
-		blockchain.VerifyTransaction(tx)
+		if blockchain.VerifyTransaction(tx) == false {
+			log.Panicf("ERROR: tx [%x] verify failed !%v\n", tx)
+		}
 	}
 	//通过数据库中最近的区块去生成最新的区块（交易打包）
 	block = NewBlock(block.Height+1, block.Hash, txs)
@@ -494,6 +499,15 @@ func (blockchain *BlockChain) SignTransaction(tx *Transaction, priKey ecdsa.Priv
 
 //验证签名
 func (bc *BlockChain) VerifyTransaction(tx *Transaction) bool {
+	if tx.IsCoinbaseTransaction() {
+		return true
+	}
+	prevTxs := make(map[string]Transaction)
+	// 查找输入所引用的交易
+	for _, vin := range tx.Vins {
+		tx := bc.FindTransaction(vin.TxHash)
+		prevTxs[hex.EncodeToString(tx.TxHash)] = tx
+	}
 	//tx.Verify
-	return tx.Verify()
+	return tx.Verify(prevTxs)
 }
