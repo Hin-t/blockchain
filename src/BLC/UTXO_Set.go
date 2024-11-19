@@ -12,7 +12,7 @@ import (
 //UTXO持久化管理
 
 //用于存放UTXO的bucket
-const utxoTableName = "utxoTable"
+const utxoTableName = "utxoTable.db"
 
 //utxo_set结构（保存指定区块链中所有的UTXO）
 
@@ -95,7 +95,7 @@ func (utxoSet *UTXOSet) ResetUTXOSet() {
 		// 查找utxo table
 		b := tx.Bucket([]byte(utxoTableName))
 		if b != nil {
-			err := b.Delete([]byte(utxoTableName))
+			err := tx.DeleteBucket([]byte(utxoTableName))
 			if err != nil {
 				log.Panicf("delete utxo table failed! %v\n", err)
 			}

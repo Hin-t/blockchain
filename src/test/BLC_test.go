@@ -40,11 +40,3 @@ func TestWallets_CreateWallet(t *testing.T) {
 	fmt.Printf("wallets: %v \n", wallets.Wallets)
 
 }
-
-// 重置utxo table
-func TestResetUTXO(t *testing.T) {
-	blockchain := BLC.BlockchainObject()
-	defer blockchain.DB.Close()
-	utxoset := BLC.UTXOSet{blockchain}
-	utxoset.ResetUTXOSet()
-}
