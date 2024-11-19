@@ -31,6 +31,11 @@ func PrintUsage() {
 	fmt.Println("\tgetbalance -address FROM -- 查询指定地址的余额")
 	fmt.Println("\t查询余额参数说明")
 	fmt.Println("\t\t-address -- 查询余额的地址")
+
+	fmt.Println("\tutxo -test METHOD -- 测试UTXO Table功能中指定的方法")
+	fmt.Println("\t\t-METHOD -- 方法名")
+	fmt.Println("\t\t\treset -- 重置UTXOtable")
+	fmt.Println("\t\t\tbalance -- 查找所有UTXO")
 }
 
 // 添加区块
@@ -62,6 +67,8 @@ func (cli *CLI) Run() {
 	sendCmd := flag.NewFlagSet("send", flag.ExitOnError)
 	//查询余额命令
 	getBalanceCmd := flag.NewFlagSet("getbalance", flag.ExitOnError)
+	//UTOX测试命令
+	utxoTestCmd := flag.NewFlagSet("utxo ", flag.ExitOnError)
 	// 数据参数处理
 	flagAddBlockArg := addBlockCmd.String("data", "sent 100 btc to player", "添加区块数据")
 	//创建区块链时指定矿工奖励地址（接收地址）
@@ -71,9 +78,15 @@ func (cli *CLI) Run() {
 	flagSendToArg := sendCmd.String("to", "", "转账目标地址")
 	flagSendAmountArg := sendCmd.String("amount", "", "转账金额")
 	flagGetBalanceArg := getBalanceCmd.String("address", "", "查询余额地址")
+	//UTXO测试命令行参数
+	flagUTXOTestArg := utxoTestCmd.String("method", "", "UTXO相关操作")
 
 	// 判断命令
 	switch os.Args[1] {
+	case "utxo":
+		if err := utxoTestCmd.Parse(os.Args[2:]); err != nil {
+			log.Panicf("parse cmd of operate utxo table failed! %v\n", err)
+		}
 	case "getaccounts":
 		if err := getAccountsCmd.Parse(os.Args[2:]); err != nil {
 			log.Panicf("parse cmd of  get accounts failed! %v\n", err)
@@ -109,6 +122,15 @@ func (cli *CLI) Run() {
 		os.Exit(1)
 	}
 
+	//
+	if utxoTestCmd.Parsed() {
+		switch *flagUTXOTestArg {
+		case "reset":
+			cli.TestResetUTXO()
+		case "balance":
+			cli.TestFindUTXOMap()
+		}
+	}
 	// 获取地址列表
 	if getAccountsCmd.Parsed() {
 		cli.GetAccounts()

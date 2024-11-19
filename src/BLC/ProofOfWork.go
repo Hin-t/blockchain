@@ -51,7 +51,7 @@ func (proofOfWork *ProofOfWork) Run() ([]byte, int64) {
 		}
 		nonce++
 	}
-	fmt.Printf("\n碰撞次数：%d", nonce)
+	fmt.Printf("\n碰撞次数：%d\n", nonce)
 	return hash[:], int64(nonce)
 }
 
