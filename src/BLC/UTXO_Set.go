@@ -147,7 +147,7 @@ func (utxoSet *UTXOSet) Update() {
 						}
 						// 如果交易中没有UTXO，删除该交易
 						if len(updateOutputs.TXOutputs) == 0 {
-							b.DeleteBucket(vin.TxHash)
+							b.Delete(vin.TxHash)
 						} else {
 							// 将更新之后的存入数据库
 							b.Put(vin.TxHash, updateOutputs.Serialize())
