@@ -43,7 +43,7 @@ func CreateBlockChainWithGenesisBlock(address string) *BlockChain {
 	}
 
 	// 2. 创建桶，把生成的创世区块存入数据库中
-	db.Update(func(tx *bolt.Tx) error {
+	err = db.Update(func(tx *bolt.Tx) error {
 		// err := tx.DeleteBucket([]byte(blockTableName))
 
 		b, err := tx.CreateBucket([]byte(blockTableName))
@@ -72,6 +72,9 @@ func CreateBlockChainWithGenesisBlock(address string) *BlockChain {
 		}
 		return nil
 	})
+	if err != nil {
+		return nil
+	}
 	return &BlockChain{db, blockHash}
 }
 
@@ -89,7 +92,7 @@ func (bc *BlockChain) AddBlock(txs []*Transaction) {
 	// bc.Blocks = append(bc.Blocks, newBlock)
 
 	// 更新区块（insert）
-	bc.DB.Update(func(tx *bolt.Tx) error {
+	err := bc.DB.Update(func(tx *bolt.Tx) error {
 		// 1.获取数据库桶
 		b := tx.Bucket([]byte(blockTableName))
 		if b != nil {
@@ -114,6 +117,9 @@ func (bc *BlockChain) AddBlock(txs []*Transaction) {
 		}
 		return nil
 	})
+	if err != nil {
+		return
+	}
 
 }
 
@@ -209,7 +215,7 @@ func (blockchain *BlockChain) MineNewBlock(from []string, to []string, amount []
 	}
 
 	//从数据库中获取最新一个区块
-	blockchain.DB.View(func(tx *bolt.Tx) error {
+	err := blockchain.DB.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(blockTableName))
 		if b != nil {
 			//获取最新区块的哈希
@@ -221,6 +227,9 @@ func (blockchain *BlockChain) MineNewBlock(from []string, to []string, amount []
 		}
 		return nil
 	})
+	if err != nil {
+		return
+	}
 	// 此处交易签名验证
 	// 对txs中每一笔交易的签名都进行验证
 	for _, tx := range txs {
@@ -232,7 +241,7 @@ func (blockchain *BlockChain) MineNewBlock(from []string, to []string, amount []
 	//通过数据库中最近的区块去生成最新的区块（交易打包）
 	block = NewBlock(block.Height+1, block.Hash, txs)
 	//持久化新生成的区块到数据库中
-	blockchain.DB.Update(func(tx *bolt.Tx) error {
+	err = blockchain.DB.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(blockTableName))
 		if b != nil {
 			err := b.Put(block.Hash, block.Serialize())
@@ -248,6 +257,9 @@ func (blockchain *BlockChain) MineNewBlock(from []string, to []string, amount []
 		}
 		return nil
 	})
+	if err != nil {
+		return
+	}
 }
 
 // 获取指定地址所有已花费输出
@@ -510,4 +522,87 @@ func (bc *BlockChain) VerifyTransaction(tx *Transaction) bool {
 	}
 	//tx.Verify
 	return tx.Verify(prevTxs)
+}
+
+//查找整条区块链所有已花费输出
+func (blockchain *BlockChain) FindAllSpentOutputs() map[string][]*TxINPUT {
+	bcit := blockchain.Iterator()
+	//存储已花费输出
+	spentOutputs := make(map[string][]*TxINPUT)
+	for {
+		block := bcit.Next()
+		for _, tx := range block.Txs {
+			if !tx.IsCoinbaseTransaction() {
+				for _, txInput := range tx.Vins {
+					txHash := hex.EncodeToString(txInput.TxHash)
+					spentOutputs[txHash] = append(spentOutputs[txHash], txInput)
+				}
+			}
+		}
+		if isBreakLoop(block.PrevBlockHash) {
+			break
+		}
+	}
+	return spentOutputs
+}
+
+//退出条件
+func isBreakLoop(prevBlockHash []byte) bool {
+	var hashInt big.Int
+	hashInt.SetBytes(prevBlockHash)
+	if hashInt.Cmp(big.NewInt(0)) == 0 {
+		return true
+	}
+	return false
+}
+
+// 查找整条区块链中所有地址的UTXO
+func (blockchain *BlockChain) FindUTXOMap() map[string]*TXOutputs {
+	utxoMaps := make(map[string]*TXOutputs)
+	//遍历区块链
+	bcit := blockchain.Iterator()
+	//查找已花费输出
+	spentTXOutputs := blockchain.FindAllSpentOutputs()
+	for {
+		block := bcit.Next()
+		txOutputs := &TXOutputs{[]*TxOutput{}}
+		for _, tx := range block.Txs {
+			txHash := hex.EncodeToString(tx.TxHash)
+			//获取每笔交易的vouts
+		WorkOutLoop:
+			for index, vout := range tx.Vouts {
+				//获取指定交易的输入
+				txInputs := spentTXOutputs[txHash]
+				if len(txInputs) > 0 {
+					isSpent := false
+					for _, in := range txInputs {
+						//查找指定输出的所有者
+						outPubKey := vout.Ripemd160Hash
+						inPubKey := in.PublicKey
+						if bytes.Compare(Ripemd160Hash(inPubKey), outPubKey) == 0 {
+							if index == in.Vout {
+								isSpent = true
+								continue WorkOutLoop
+							}
+						}
+					}
+					if isSpent == false {
+						//当前输出没有被包含到txInputs中
+						txOutputs.TXOutputs = append(txOutputs.TXOutputs, vout)
+					}
+				} else {
+					//没有input引用该交易的输出，代表则代表当前交易中所有的输出都是UTXO
+					txOutputs.TXOutputs = append(txOutputs.TXOutputs, vout)
+
+				}
+
+			}
+			utxoMaps[txHash] = txOutputs
+		}
+		if isBreakLoop(block.PrevBlockHash) {
+			break
+		}
+	}
+	return utxoMaps
+
 }
