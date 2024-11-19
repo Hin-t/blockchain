@@ -18,8 +18,9 @@ type Block struct {
 	PrevBlockHash []byte // 前一个区块hash
 	Height        int64  // 区块高度
 	// Data          []byte         // 交易数据
-	Txs   []*Transaction // 交易数据（交易列表）
-	Nonce int64          // 运行pow生成hash的变化值，也代表pow运行时动态修改的数据
+	MerkleRoot []byte         // Merkle Root
+	Txs        []*Transaction // 交易数据（交易列表）
+	Nonce      int64          // 运行pow生成hash的变化值，也代表pow运行时动态修改的数据
 }
 
 // 新建区块
