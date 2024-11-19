@@ -1,8 +1,6 @@
 package BLC
 
 import (
-	"bytes"
-	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -87,6 +85,9 @@ func (block *Block) HashTransaction() []byte {
 	for _, tx := range block.Txs {
 		txsHashes = append(txsHashes, tx.TxHash)
 	}
-	txsHash := sha256.Sum256(bytes.Join(txsHashes, []byte{}))
-	return txsHash[:]
+	//将交易哈希存入merkle tree中，然后生成merkle root
+	merkleTree := NewMerkleTree(txsHashes)
+
+	//txsHash := sha256.Sum256(bytes.Join(txsHashes, []byte{}))
+	return merkleTree.RootNode.Data
 }
