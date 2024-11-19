@@ -21,7 +21,7 @@ type UTXOSet struct {
 //更新
 
 //查找
-
+func ()
 //重置
 func (utxoSet *UTXOSet) ResetUTXOSet() {
 	//在第一次创建的时候就更新utxo table
