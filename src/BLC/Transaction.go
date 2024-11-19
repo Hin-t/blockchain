@@ -2,11 +2,14 @@ package BLC
 
 import (
 	"bytes"
+	"crypto/ecdsa"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/gob"
 	"encoding/hex"
 	"fmt"
 	"log"
+	"math/big"
 )
 
 //交易管理文件
@@ -26,11 +29,12 @@ func NewCoinbaseTransaction(address string) *Transaction {
 	//txHash：nil
 	//vout：
 	//ScriptSig
-	txInput := &TxINPUT{[]byte{}, -1, "system reward"}
+	txInput := &TxINPUT{[]byte{}, -1, nil, nil}
 	//输出：
 	//value：
 	//address:
-	txOutput := &TxOutput{10, address}
+	//txOutput := &TxOutput{10, String2Hash160(address)}
+	txOutput := NewTxOutput(10, address)
 	txCoinbase := &Transaction{nil, []*TxINPUT{txInput}, []*TxOutput{txOutput}}
 	txCoinbase.HashTransaction()
 	return txCoinbase
@@ -56,6 +60,10 @@ func NewSimpleTransaction(from string, to string, amount int, bc *BlockChain, tx
 	// 调用可花费UTXO函数
 	money, spendableUTXODic := bc.FindSpendableUTXO(from, amount, txs)
 	fmt.Printf("money: %v\n", money)
+	// 获取钱包集合对象
+	wallets := NewWallets()
+	// 查找对应的钱包结构
+	wallet := wallets.Wallets[from]
 	//输入
 	for txHash, indexArray := range spendableUTXODic {
 		txHashBytes, err := hex.DecodeString(txHash)
@@ -64,27 +72,106 @@ func NewSimpleTransaction(from string, to string, amount int, bc *BlockChain, tx
 		}
 		// 遍历索引列表
 		for _, index := range indexArray {
-			txInput := &TxINPUT{txHashBytes, index, from}
+			txInput := &TxINPUT{txHashBytes, index, wallet.PublicKey, nil}
 			txInputs = append(txInputs, txInput)
 		}
 	}
 	//输出(转账源)
-	txOutput := &TxOutput{amount, to}
+	//txOutput := &TxOutput{amount, to}
+	txOutput := NewTxOutput(amount, to)
 	txOutputs = append(txOutputs, txOutput)
 	//输出（找零）
 	if money > amount {
-		txOutput = &TxOutput{money - amount, from}
+		//txOutput = &TxOutput{money - amount, from}
+		txOutput := NewTxOutput(money-amount, from)
 		txOutputs = append(txOutputs, txOutput)
 	} else {
 		log.Panicf("余额不足...\n")
 	}
 
 	tx := Transaction{nil, txInputs, txOutputs}
-	tx.HashTransaction()
+	tx.HashTransaction() // 生成一笔完整的交易
+	//签名
+	bc.SignTransaction(&tx, wallet.PrivateKey)
 	return &tx
 }
 
 // 判断一个指定的交易是否时一个coinbase交易
 func (tx *Transaction) IsCoinbaseTransaction() bool {
 	return tx.Vins[0].Vout == -1 && len(tx.Vins[0].TxHash) == 0
+}
+
+//交易签名
+// prevTxs代表当前交易的输入所引用的所有output所属的交易
+func (tx *Transaction) Sign(privateKey ecdsa.PrivateKey, prevTxs map[string]Transaction) {
+	// 处理输入，保证签名的正确性
+	// 检查tx每一个输入所引用的交易hash是否包含在prevTxs中
+	// 如果没有包含在里面，则说明交易被人篡改过
+	for _, vin := range tx.Vins {
+		if prevTxs[hex.EncodeToString(vin.TxHash)].TxHash == nil {
+			log.Panicf("Error : prev transaction is not correct!\n")
+		}
+	}
+	// 提取需要签名的属性
+	txCopy := tx.TrimmedCopy()
+	// 处理副本的输入
+	for vin_id, vin := range txCopy.Vins {
+		// 获取关联交易
+		prevTx := prevTxs[hex.EncodeToString(vin.TxHash)]
+		// 找到发送者（当前输入引用的哈希-输出的哈希）
+		txCopy.Vins[vin_id].TxHash = prevTx.Vouts[vin.Vout].Ripemd160Hash
+		// 生成交易副本哈希
+		txCopy.TxHash = txCopy.Hash()
+		//调用核心签名函数
+		r, s, err := ecdsa.Sign(rand.Reader, &privateKey, txCopy.TxHash)
+		if err != nil {
+			log.Panicf("sign to transaction [%x] failed! %v\n", tx, err)
+		}
+
+		// 组成交易签名
+		signature := append(r.Bytes(), s.Bytes()...)
+		tx.Vins[vin_id].Signature = signature
+	}
+
+}
+
+// 交易拷贝，生成一个专门用于签名的副本
+func (tx *Transaction) TrimmedCopy() Transaction {
+	// 从新组装，生成一个新的交易
+	var inputs []*TxINPUT
+	var outputs []*TxOutput
+	// 组装input
+	for _, vin := range tx.Vins {
+		inputs = append(inputs, &TxINPUT{vin.TxHash, vin.Vout, nil, nil})
+	}
+	// 组装output
+	for _, vout := range tx.Vouts {
+		outputs = append(outputs, &TxOutput{vout.Value, vout.Ripemd160Hash})
+	}
+	txCopy := Transaction{nil, inputs, outputs}
+	return txCopy
+}
+
+// 设置用于签名的交易hash
+func (tx *Transaction) Hash() []byte {
+	txCopy := tx
+	txCopy.TxHash = []byte{}
+	hash := sha256.Sum256(tx.Serialize())
+	return hash[:]
+}
+
+// 交易的序列化
+func (tx *Transaction) Serialize() []byte {
+	var buffer bytes.Buffer
+	encoder := gob.NewEncoder(&buffer)
+	if err := encoder.Encode(tx); err != nil {
+		log.Panic("serialize the tx to byte failed! %V\n", err)
+	}
+	return buffer.Bytes()
+}
+
+// 验证签名
+func (tx *Transaction) Verify() bool {
+	//调用验证签名核心函数
+	return ecdsa.Verify(nil, nil, big.NewInt(0), big.NewInt(0))
 }

@@ -1,6 +1,8 @@
 package BLC
 
 import (
+	"bytes"
+	"crypto/ecdsa"
 	"encoding/hex"
 	"fmt"
 	"log"
@@ -142,12 +144,13 @@ func (bc *BlockChain) PrintChain() {
 			for _, vin := range tx.Vins {
 				fmt.Printf("\t\t\tvin-hash: %x\n", vin.TxHash)
 				fmt.Printf("\t\t\tvin-vout: %v\n", vin.Vout)
-				fmt.Printf("\t\t\tvin-ScriptSig: %s\n", vin.ScriptSig)
+				fmt.Printf("\t\t\tvin-PublicKey: %x\n", vin.PublicKey)
+				fmt.Printf("\t\t\tvin-Signature: %x\n", vin.Signature)
 			}
 			fmt.Printf("\t\t输出...: \n")
 			for _, vout := range tx.Vouts {
 				fmt.Printf("\t\t\tvout-value: %d\n", vout.Value)
-				fmt.Printf("\t\t\tvout-ScriptPubkey: %v\n", vout.ScriptPubkey)
+				fmt.Printf("\t\t\tvout-Ripemd160Hash: %x\n", vout.Ripemd160Hash)
 			}
 		}
 		// 退出条件
@@ -197,6 +200,7 @@ func (blockchain *BlockChain) MineNewBlock(from []string, to []string, amount []
 		value, _ := strconv.Atoi(amount[index])
 
 		tx := NewSimpleTransaction(address, to[index], value, blockchain, txs)
+
 		//追加到txs的交易列表中去
 		txs = append(txs, tx)
 	}
@@ -214,7 +218,13 @@ func (blockchain *BlockChain) MineNewBlock(from []string, to []string, amount []
 		}
 		return nil
 	})
-	//通过数据库中最近的区块去生成最新的区块
+	// 此处交易签名验证
+	// 对txs中每一笔交易的签名都进行验证
+	for _, tx := range txs {
+		//只要有一笔交易验证失败。panic
+		blockchain.VerifyTransaction(tx)
+	}
+	//通过数据库中最近的区块去生成最新的区块（交易打包）
 	block = NewBlock(block.Height+1, block.Hash, txs)
 	//持久化新生成的区块到数据库中
 	blockchain.DB.Update(func(tx *bolt.Tx) error {
@@ -247,11 +257,12 @@ func (blockchain *BlockChain) SpentOutputs(address string) map[string][]int {
 			//排除coinbase交易
 			if !tx.IsCoinbaseTransaction() {
 				for _, in := range tx.Vins {
-					if in.CheckPubkeyWithAddress(address) {
+					if in.UnLockRipemd160Hash(String2Hash160(address)) {
 						key := hex.EncodeToString(in.TxHash)
 						//添加到已花费输出的缓存中
 						spentTXoutputs[key] = append(spentTXoutputs[key], in.Vout)
 					}
+
 				}
 			}
 		}
@@ -289,12 +300,14 @@ func (blockchain *BlockChain) UnUTXOS(address string, txs []*Transaction) []*UTX
 		// 判断coninbaseTransaction
 		if !tx.IsCoinbaseTransaction() {
 			for _, in := range tx.Vins {
+
 				// 判断用户
-				if in.CheckPubkeyWithAddress(address) {
+				if in.UnLockRipemd160Hash(String2Hash160(address)) {
 					// 添加到已花费输出的map中
 					key := hex.EncodeToString(in.TxHash)
 					spentTXOutputs[key] = append(spentTXOutputs[key], in.Vout)
 				}
+
 			}
 		}
 	}
@@ -303,7 +316,8 @@ func (blockchain *BlockChain) UnUTXOS(address string, txs []*Transaction) []*UTX
 		// 添加一个缓存输出的跳转
 	WorkCacheTX:
 		for index, vout := range tx.Vouts {
-			if vout.CheckPubkeyWithAddress(address) {
+			if vout.UnLockScriptPubKeyWithAddress(address) {
+				//if vout.CheckPubkeyWithAddress(address) {
 				if len(spentTXOutputs) != 0 {
 					var isUtxoTx bool // 判断交易是否被其他交易引用
 					for txHash, indexArray := range spentTXOutputs {
@@ -355,7 +369,8 @@ func (blockchain *BlockChain) UnUTXOS(address string, txs []*Transaction) []*UTX
 			for index, vout := range tx.Vouts {
 				//index：当前输出在当前交易的索引位置
 				//vout：当前输出
-				if vout.CheckPubkeyWithAddress(address) {
+				if vout.UnLockScriptPubKeyWithAddress(address) {
+					//if vout.CheckPubkeyWithAddress(address) {
 					//当前vout属于传入地址
 					if len(spentTXOutputs) != 0 {
 						var isSpentOutput bool
@@ -433,4 +448,52 @@ func (blockchain *BlockChain) FindSpendableUTXO(from string, amount int, txs []*
 
 	}
 	return value, spendableUTXO
+}
+
+//通过指定交易hash查找交易
+func (blockchain *BlockChain) FindTransaction(ID []byte) Transaction {
+	bcit := blockchain.Iterator()
+	for {
+		block := bcit.Next()
+		for _, tx := range block.Txs {
+			if bytes.Compare(ID, tx.TxHash) == 0 {
+				// 找到该交易
+				return *tx
+			}
+		}
+		// 退出
+		var hashInt big.Int
+		hashInt.SetBytes(block.PrevBlockHash)
+		if big.NewInt(0).Cmp(&hashInt) == 0 {
+			break
+		}
+	}
+	fmt.Print("没找到交易[%x]\n", ID)
+	return Transaction{}
+}
+
+// 交易签名
+func (blockchain *BlockChain) SignTransaction(tx *Transaction, priKey ecdsa.PrivateKey) {
+	//ecdsa
+	// coinbase 交易不用签名
+	if tx.IsCoinbaseTransaction() {
+		return
+	}
+
+	//处理交易的input，查找tx中input所引用的vout所属交易（发送者）
+	//对所花费的每一笔utxo进行签名
+	prevTxs := make(map[string]Transaction)
+	for _, vin := range tx.Vins {
+		//查找当前交易输入所引用的交易 vin.TxHash
+		tx := blockchain.FindTransaction(vin.TxHash)
+		prevTxs[hex.EncodeToString(tx.TxHash)] = tx
+	}
+	//签名
+	tx.Sign(priKey, prevTxs)
+}
+
+//验证签名
+func (bc *BlockChain) VerifyTransaction(tx *Transaction) bool {
+	//tx.Verify
+	return tx.Verify()
 }

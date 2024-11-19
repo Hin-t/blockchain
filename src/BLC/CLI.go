@@ -15,6 +15,7 @@ func PrintUsage() {
 	fmt.Println("Usage:")
 
 	fmt.Println("\tcreatewallet -- 创建钱包")
+	fmt.Println("\tgetaccount -- 获取账户列表")
 	// 初始化区块链
 	fmt.Println("\tcreateblockchain -address address -- 创建区块链")
 	// 添加区块
@@ -47,6 +48,8 @@ func (cli *CLI) Run() {
 	// 检测参数数量
 	IsValidArgs()
 	// 新建相关命令
+	//获取地址命令
+	getAccountsCmd := flag.NewFlagSet("getaccounts", flag.ExitOnError)
 	// 添加区块
 	addBlockCmd := flag.NewFlagSet("addblock", flag.ExitOnError)
 	// 创建钱包
@@ -71,6 +74,10 @@ func (cli *CLI) Run() {
 
 	// 判断命令
 	switch os.Args[1] {
+	case "getaccounts":
+		if err := getAccountsCmd.Parse(os.Args[2:]); err != nil {
+			log.Panicf("parse cmd of  get accounts failed! %v\n", err)
+		}
 	case "createwallet":
 		if err := createWalletCmd.Parse(os.Args[2:]); err != nil {
 			log.Panicf("parse cmd of create wallet failed! %v\n", err)
@@ -102,7 +109,12 @@ func (cli *CLI) Run() {
 		os.Exit(1)
 	}
 
-	if createBLCWithGenesisiBlockCmd.Parsed() {
+	// 获取地址列表
+	if getAccountsCmd.Parsed() {
+		cli.GetAccounts()
+	}
+
+	if createWalletCmd.Parsed() {
 		cli.CreateWallets()
 	}
 	//查询余额

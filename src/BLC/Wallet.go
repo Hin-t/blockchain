@@ -6,7 +6,6 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
-	"fmt"
 	"golang.org/x/crypto/ripemd160"
 	"log"
 )
@@ -70,13 +69,10 @@ func CheckSum(input []byte) []byte {
 func (w *Wallet) GetAddress() []byte {
 	// 1. 获取hash160
 	ripmed160Hash := Ripemd160Hash(w.PublicKey)
-	fmt.Printf("%v\n", ripmed160Hash)
 	// 2. 获取校验和
 	checkSumBytes := CheckSum(ripmed160Hash)
-	fmt.Printf("%v\n", checkSumBytes)
 	// 3. 地址组成成员拼接
 	addressBytes := append(ripmed160Hash, checkSumBytes...)
-	fmt.Printf("%v\n", addressBytes)
 	// 4. base58编码
 	b58Bytes := Base58Encode(addressBytes)
 

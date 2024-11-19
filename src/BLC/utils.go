@@ -36,3 +36,10 @@ func IsValidArgs() {
 		os.Exit(1)
 	}
 }
+
+// string 2 hash160
+func String2Hash160(address string) []byte {
+	pubKeyHash := Base58Decode([]byte(address))
+
+	return pubKeyHash[:len(pubKeyHash)-addressChecksumLen]
+}

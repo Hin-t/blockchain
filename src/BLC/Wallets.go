@@ -51,7 +51,6 @@ func (wallets *Wallets) CreateWallet() {
 	wallet := NewWallet()
 	// 2. 添加
 	wallets.Wallets[string(wallet.GetAddress())] = wallet
-
 	// 3. 持久化钱包信息
 	wallets.SaveWallet()
 }
