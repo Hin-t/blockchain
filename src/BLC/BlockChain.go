@@ -565,8 +565,9 @@ func (blockchain *BlockChain) FindUTXOMap() map[string]*TXOutputs {
 	spentTXOutputs := blockchain.FindAllSpentOutputs()
 	for {
 		block := bcit.Next()
-		txOutputs := &TXOutputs{[]*TxOutput{}}
+
 		for _, tx := range block.Txs {
+			txOutputs := &TXOutputs{[]*TxOutput{}}
 			txHash := hex.EncodeToString(tx.TxHash)
 			//获取每笔交易的vouts
 		WorkOutLoop:

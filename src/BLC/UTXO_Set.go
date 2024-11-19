@@ -40,8 +40,6 @@ func DeserializeTXOutputs(txOutputsBytes []byte) *TXOutputs {
 	return &txOutputs
 }
 
-//更新
-
 //查询余额
 func (utxoSet *UTXOSet) GetBalance(address string) int {
 	UTXOS := utxoSet.FindUTXOWithAddress(address)
@@ -119,6 +117,51 @@ func (utxoSet *UTXOSet) ResetUTXOSet() {
 					log.Panicf("put utxo to bucket failed! %v\n", err)
 				}
 			}
+		}
+		return nil
+	})
+}
+
+//更新
+func (utxoSet *UTXOSet) Update() {
+	//1获取最新区块
+	latest_block := utxoSet.BlockChain.Iterator().Next()
+	utxoSet.BlockChain.DB.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(utxoTableName))
+		if b != nil {
+			// 只需查找最新一个区块的交易列表，因为每上链一个区块
+			// utxo table都更新一次，所以只需查找最近一个区块中的交易
+			for _, tx := range latest_block.Txs {
+				if !tx.IsCoinbaseTransaction() {
+					// 2.将已经被当前这笔交易输入引用的utxo删除
+					for _, vin := range tx.Vins {
+						// 需要更新的输出
+						updateOutputs := TXOutputs{}
+						// 获取指定输入所引用的交易哈希的输出
+						outputBytes := b.Get(vin.TxHash)
+						outs := DeserializeTXOutputs(outputBytes)
+						for outIdx, out := range outs.TXOutputs {
+							if vin.Vout != outIdx {
+								updateOutputs.TXOutputs = append(updateOutputs.TXOutputs, out)
+							}
+						}
+						// 如果交易中没有UTXO，删除该交易
+						if len(updateOutputs.TXOutputs) == 0 {
+							b.DeleteBucket(vin.TxHash)
+						} else {
+							// 将更新之后的存入数据库
+							b.Put(vin.TxHash, updateOutputs.Serialize())
+						}
+					}
+
+				}
+				// 获取当前区块中新生成交易输出
+				newOutputs := TXOutputs{}
+				newOutputs.TXOutputs = append(newOutputs.TXOutputs, tx.Vouts...)
+				b.Put(tx.TxHash, newOutputs.Serialize())
+			}
+			// 1.将最新区块中的UTXO插入
+
 		}
 		return nil
 	})
