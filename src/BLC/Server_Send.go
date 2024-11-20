@@ -28,7 +28,7 @@ func SendMessage(to, from string, msg []byte) {
 }
 
 // 区块链版本验证
-func sendVersion(toAddress string) {
+func sendVersion(toAddress string, bc *BlockChain) {
 	// 1. 获取当前节点区块高度
 	height := 1
 	// 2.组装生成version
