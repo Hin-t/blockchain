@@ -22,6 +22,7 @@ func (cli *CLI) SetNodeID(nodeID string) {
 		}
 	case "linux":
 	case "windows":
+		fmt.Printf("Windows. node id is %s\n", nodeID)
 		err := os.Setenv("Node_ID", nodeID)
 		if err != nil {
 			log.Fatalf("set env failed! %v\n", err)
