@@ -3,6 +3,7 @@ package BLC
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/gob"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -53,4 +54,24 @@ func GetEnvNodeID() string {
 		os.Exit(1)
 	}
 	return nodeId
+}
+
+// gob编码
+func gobEncode(data interface{}) []byte {
+	var buf bytes.Buffer
+	encoder := gob.NewEncoder(&buf)
+	err := encoder.Encode(data)
+	if err != nil {
+		log.Panic(err)
+	}
+	return buf.Bytes()
+}
+
+// 命令转换为请求([]byte)
+func commandToBytes(cmd string) []byte {
+	var bytes [COMMAND_LENGTH]byte
+	for i, c := range cmd {
+		bytes[i] = byte(c)
+	}
+	return bytes[:]
 }

@@ -20,7 +20,7 @@ func (cli *CLI) send(from, to, amount []string, nodeID string) {
 		os.Exit(1)
 	}
 	//发起交易，生成新的区块
-	blockchain.MineNewBlock(from, to, amount)
+	blockchain.MineNewBlock(from, to, amount, nodeID)
 	//调用utxo table的函数更新utxo table
 	utxoSet := &UTXOSet{blockchain}
 	utxoSet.Update()

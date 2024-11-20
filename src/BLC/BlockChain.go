@@ -15,7 +15,7 @@ import (
 
 // 区块链文件管理
 // 数据库名称
-const dbName = "block%s.db"
+const dbName = "block_%s.db"
 
 // 表名称
 const blockTableName = "blocks"
@@ -202,7 +202,7 @@ func BlockchainObject(nodeID string) *BlockChain {
 
 // 实现挖矿功能
 // 通过接收交易，生成区块
-func (blockchain *BlockChain) MineNewBlock(from []string, to []string, amount []string) {
+func (blockchain *BlockChain) MineNewBlock(from []string, to []string, amount []string, nodeID string) {
 	//搁置交易生成步骤
 	var block *Block
 	var txs []*Transaction
@@ -211,7 +211,7 @@ func (blockchain *BlockChain) MineNewBlock(from []string, to []string, amount []
 		//调用生成新的交易
 		value, _ := strconv.Atoi(amount[index])
 
-		tx := NewSimpleTransaction(address, to[index], value, blockchain, txs)
+		tx := NewSimpleTransaction(address, to[index], value, blockchain, txs, nodeID)
 
 		//追加到txs的交易列表中去
 		txs = append(txs, tx)

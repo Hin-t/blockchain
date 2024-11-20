@@ -13,21 +13,22 @@ func (cli *CLI) SetNodeID(nodeID string) {
 		fmt.Println("nodeID is empty, please set the node id...")
 		os.Exit(1)
 	}
+
 	switch runtime.GOOS {
 	case "darwin":
-		fmt.Println("OS X.")
-		err := os.Setenv("Node_ID", nodeID)
-		if err != nil {
-			log.Fatalf("set env failed! %v\n", err)
-		}
+		fmt.Println("OS X detected.")
 	case "linux":
+		fmt.Println("Linux detected.")
 	case "windows":
-		fmt.Printf("Windows. node id is %s\n", nodeID)
-		err := os.Setenv("Node_ID", nodeID)
-		if err != nil {
-			log.Fatalf("set env failed! %v\n", err)
-		}
+		fmt.Println("Windows detected.")
 	default:
-		return
+		fmt.Printf("Unsupported OS: %s\n", runtime.GOOS)
+		os.Exit(1)
+	}
+
+	fmt.Printf("node id is %s\n", nodeID)
+	err := os.Setenv("NODE_ID", nodeID)
+	if err != nil {
+		log.Fatalf("set env failed! %v\n", err)
 	}
 }

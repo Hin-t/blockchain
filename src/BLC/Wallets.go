@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/elliptic"
 	"encoding/gob"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -12,7 +13,7 @@ import (
 // 钱包集合的管理文件
 
 // 钱包持久化文件
-const walletFile = "Wallets.data"
+const walletFile = "Wallets_%s.data"
 
 // 实现钱包集合的基本结构
 type Wallets struct {
@@ -22,9 +23,10 @@ type Wallets struct {
 }
 
 // 初始化钱包集合
-func NewWallets() *Wallets {
+func NewWallets(nodeID string) *Wallets {
 	// 从钱包文件中获取钱包信息
 	// 1. 判断文件是否存在
+	walletFile := fmt.Sprintf(walletFile, nodeID)
 	if _, err := os.Stat(walletFile); os.IsNotExist(err) {
 		wallets := &Wallets{}
 		wallets.Wallets = make(map[string]*Wallet)
@@ -46,17 +48,17 @@ func NewWallets() *Wallets {
 }
 
 // 添加新的钱包到集合中
-func (wallets *Wallets) CreateWallet() {
+func (wallets *Wallets) CreateWallet(nodeID string) {
 	// 1. 创建钱包
 	wallet := NewWallet()
 	// 2. 添加
 	wallets.Wallets[string(wallet.GetAddress())] = wallet
 	// 3. 持久化钱包信息
-	wallets.SaveWallet()
+	wallets.SaveWallet(nodeID)
 }
 
 // 持久化钱包信息(存储到文件中)
-func (wallets *Wallets) SaveWallet() {
+func (wallets *Wallets) SaveWallet(nodeID string) {
 	var content bytes.Buffer // 钱包内容
 	// 注册256椭圆曲线，注册之后可以直接在内部对curve的接口进行编码
 	gob.Register(elliptic.P256())
@@ -66,6 +68,7 @@ func (wallets *Wallets) SaveWallet() {
 		log.Panicf("encode the struct of wallets failed %v !\n", err)
 	}
 
+	walletFile := fmt.Sprintf(walletFile, nodeID)
 	err = ioutil.WriteFile(walletFile, content.Bytes(), 0644)
 	if err != nil {
 		log.Panicf("write the content of wallet into file [%s] failed! %v\n", walletFile, err)

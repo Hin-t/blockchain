@@ -12,6 +12,7 @@ type CLI struct {
 
 // 用法展示
 func PrintUsage() {
+
 	fmt.Println("Usage:")
 
 	fmt.Println("\tcreatewallet -- 创建钱包")
@@ -35,6 +36,8 @@ func PrintUsage() {
 	fmt.Println("\tset_id -port PORT -- 设置端口节点号")
 	fmt.Println("\t\t-port -- 访问的节点号")
 
+	fmt.Println("\tstart -- 启动节点服务")
+
 	fmt.Println("\tutxo -test METHOD -- 测试UTXO Table功能中指定的方法")
 	fmt.Println("\t\t-METHOD -- 方法名")
 	fmt.Println("\t\t\treset -- 重置UTXOtable")
@@ -47,9 +50,14 @@ func (cli *CLI) addBlock(txs []*Transaction) {
 }
 
 func (cli *CLI) Run() {
+	// 获取node id
+	nodeID := GetEnvNodeID()
+	fmt.Println("Node id is :", nodeID)
 	// 检测参数数量
 	IsValidArgs()
 	// 新建相关命令
+	//启动节点命令
+	startNodeCmd := flag.NewFlagSet("start", flag.ExitOnError)
 	//获取地址命令
 	getAccountsCmd := flag.NewFlagSet("getaccounts", flag.ExitOnError)
 	// 添加区块
@@ -86,6 +94,10 @@ func (cli *CLI) Run() {
 	flagSetPortArg := setPortCmd.String("port", "", "端口号")
 	// 判断命令
 	switch os.Args[1] {
+	case "start":
+		if err := startNodeCmd.Parse(os.Args[2:]); err != nil {
+			log.Panicf("parse cmd of start node failed! %v\n", err)
+		}
 	case "set_id":
 		if err := setPortCmd.Parse(os.Args[2:]); err != nil {
 			log.Panicf("parse cmd of set node id failed! %v\n", err)
@@ -128,6 +140,10 @@ func (cli *CLI) Run() {
 		PrintUsage()
 		os.Exit(1)
 	}
+	//启动节点服务
+	if startNodeCmd.Parsed() {
+		cli.startNode(nodeID)
+	}
 	//设置端口号
 	if setPortCmd.Parsed() {
 		if *flagSetPortArg == "" {
@@ -137,8 +153,6 @@ func (cli *CLI) Run() {
 		}
 		cli.SetNodeID(*flagSetPortArg)
 	}
-
-	nodeID := GetEnvNodeID()
 
 	// utxo测试命令
 	if utxoTestCmd.Parsed() {
@@ -151,11 +165,11 @@ func (cli *CLI) Run() {
 	}
 	// 获取地址列表
 	if getAccountsCmd.Parsed() {
-		cli.GetAccounts()
+		cli.GetAccounts(nodeID)
 	}
 
 	if createWalletCmd.Parsed() {
-		cli.CreateWallets()
+		cli.CreateWallets(nodeID)
 	}
 	//查询余额
 	if getBalanceCmd.Parsed() {
