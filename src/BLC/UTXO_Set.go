@@ -59,6 +59,7 @@ func (utxoSet *UTXOSet) FindUTXOWithAddress(address string) []*UTXO {
 	var utxos []*UTXO
 	err := utxoSet.BlockChain.DB.View(func(tx *bolt.Tx) error {
 		//1. 获取utxo table
+		utxoTableName := fmt.Sprintf(utxoTableName)
 		b := tx.Bucket([]byte(utxoTableName))
 		if b != nil {
 			//cursor -- 游标

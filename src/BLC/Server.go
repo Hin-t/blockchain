@@ -26,12 +26,13 @@ func stratServer(nodeID string) {
 		log.Panicf("listen address of %s failed: %v\n!", nodeAddress, err)
 	}
 	defer listen.Close()
+	bc := BlockchainObject(nodeID)
 	// 两个节点，主节点负责保存数据，钱包节点负责发送请求，同步数据
 	if nodeAddress != knowNodes[0] {
 		// 1. 不是主节点，发送请求，同步数据
 		// ...
 		//SentMessage(knowNodes[0], nodeAddress)
-		sendVersion(knowNodes[0])
+		sendVersion(knowNodes[0], bc)
 	}
 
 	for {
@@ -40,32 +41,33 @@ func stratServer(nodeID string) {
 		if err != nil {
 			log.Panicf("accept connect failed: %v", err)
 		}
+		defer conn.Close()
 		//处理请求
 		// 单独启动一个goroutine 进行请求处理
-		go handleConnection(conn)
+		go handleConnection(conn, bc)
 	}
 }
 
 // worker
 // 请求处理函数
-func handleConnection(conn net.Conn) {
+func handleConnection(conn net.Conn, bc *BlockChain) {
 	request, err := ioutil.ReadAll(conn)
 	if err != nil {
 		log.Panicf("Receive a request failed: %v\n", err)
 	}
 	cmd := bytesToCommand(request[:COMMAND_LENGTH])
-	fmt.Printf("Receive a command %s\n!", cmd)
+	fmt.Printf("Receive a command [%s]\n", cmd)
 	switch cmd {
 	case CMD_VERSION:
-		handleVersion()
+		handleVersion(request, bc)
 	case CMD_GETDATA:
-		handleGetData()
+		handleGetData(request, bc)
 	case CMD_GETBLOCKS:
-		handleGetBlocks()
+		handleGetBlocks(request, bc)
 	case CMD_INV:
-		handleInv()
+		handleInv(request, bc)
 	case CMD_BLOCK:
-		handleBlock()
+		handleBlock(request, bc)
 	default:
 		fmt.Printf("Command not recognized\n")
 

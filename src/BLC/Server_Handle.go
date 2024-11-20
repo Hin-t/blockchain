@@ -28,6 +28,7 @@ func handleVersion(requests []byte, bc *BlockChain) {
 	height := bc.GetHeight()
 	// 如果当前节点的区块高度大于versionHeight
 	// 将当前节点版本信息发送给请求节点
+	fmt.Printf("the version height is %d,height is %d\n", versionHeight, height)
 	if height > int64(versionHeight) {
 		sendVersion(data.AddressFrom, bc)
 	} else if height < int64(versionHeight) {
@@ -88,9 +89,11 @@ func handleInv(requests []byte, bc *BlockChain) {
 	if err := decoder.Decode(&data); err != nil {
 		log.Panicf("decode the Inv struct failed!%v\n", err)
 	}
+	//sendGetData(data.AddressFrom, data.Hashes[0])
 	for _, hash := range data.Hashes {
 		sendGetData(data.AddressFrom, hash)
 	}
+
 }
 
 // Block
