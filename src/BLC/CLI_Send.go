@@ -6,13 +6,13 @@ import (
 )
 
 // 发起交易函数
-func (cli *CLI) send(from []string, to []string, amount []string) {
-	if !dbExist() {
+func (cli *CLI) send(from, to, amount []string, nodeID string) {
+	if !dbExist(nodeID) {
 		fmt.Println("数据库不存在...")
 		os.Exit(1)
 	}
 	//获取区块链对象
-	blockchain := BlockchainObject()
+	blockchain := BlockchainObject(nodeID)
 	defer blockchain.DB.Close()
 
 	if len(from) != len(to) || len(from) != len(amount) {

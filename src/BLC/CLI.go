@@ -32,6 +32,9 @@ func PrintUsage() {
 	fmt.Println("\t查询余额参数说明")
 	fmt.Println("\t\t-address -- 查询余额的地址")
 
+	fmt.Println("\tset_id -port PORT -- 设置端口节点号")
+	fmt.Println("\t\t-port -- 访问的节点号")
+
 	fmt.Println("\tutxo -test METHOD -- 测试UTXO Table功能中指定的方法")
 	fmt.Println("\t\t-METHOD -- 方法名")
 	fmt.Println("\t\t\treset -- 重置UTXOtable")
@@ -40,13 +43,7 @@ func PrintUsage() {
 
 // 添加区块
 func (cli *CLI) addBlock(txs []*Transaction) {
-	// 获取到blockchain的对象实例
-	if !dbExist() {
-		fmt.Println("数据库不存在")
-		os.Exit(1)
-	}
-	blockchain := BlockchainObject()
-	blockchain.AddBlock(txs)
+	//
 }
 
 func (cli *CLI) Run() {
@@ -69,6 +66,11 @@ func (cli *CLI) Run() {
 	getBalanceCmd := flag.NewFlagSet("getbalance", flag.ExitOnError)
 	//UTOX测试命令
 	utxoTestCmd := flag.NewFlagSet("utxo ", flag.ExitOnError)
+	//端口号
+	setPortCmd := flag.NewFlagSet("set_id", flag.ExitOnError)
+
+	//-------------------------------------分隔符------------------------------------------
+
 	// 数据参数处理
 	flagAddBlockArg := addBlockCmd.String("data", "sent 100 btc to player", "添加区块数据")
 	//创建区块链时指定矿工奖励地址（接收地址）
@@ -80,9 +82,14 @@ func (cli *CLI) Run() {
 	flagGetBalanceArg := getBalanceCmd.String("address", "", "查询余额地址")
 	//UTXO测试命令行参数
 	flagUTXOTestArg := utxoTestCmd.String("method", "", "UTXO相关操作")
-
+	//端口号参数
+	flagSetPortArg := setPortCmd.String("port", "", "端口号")
 	// 判断命令
 	switch os.Args[1] {
+	case "port":
+		if err := setPortCmd.Parse(os.Args[2:]); err != nil {
+			log.Panicf("parse cmd of set node id failed! %v\n", err)
+		}
 	case "utxo":
 		if err := utxoTestCmd.Parse(os.Args[2:]); err != nil {
 			log.Panicf("parse cmd of operate utxo table failed! %v\n", err)
@@ -121,12 +128,23 @@ func (cli *CLI) Run() {
 		PrintUsage()
 		os.Exit(1)
 	}
+	//设置端口号
+	if setPortCmd.Parsed() {
+		if *flagSetPortArg != "" {
+			fmt.Println("请输入要设置的端口号...")
+			//PrintUsage()
+			os.Exit(1)
+		}
+		cli.SetNodeID(*flagSetPortArg)
+	}
 
-	//
+	nodeID := GetEnvNodeID()
+
+	// utxo测试命令
 	if utxoTestCmd.Parsed() {
 		switch *flagUTXOTestArg {
 		case "reset":
-			cli.TestResetUTXO()
+			cli.TestResetUTXO(nodeID)
 		case "balance":
 			cli.TestFindUTXOMap()
 		}
@@ -146,7 +164,7 @@ func (cli *CLI) Run() {
 			//PrintUsage()
 			os.Exit(1)
 		}
-		cli.getBalance(*flagGetBalanceArg)
+		cli.getBalance(*flagGetBalanceArg, nodeID)
 	}
 	// 添加区块命令
 	if addBlockCmd.Parsed() {
@@ -159,7 +177,7 @@ func (cli *CLI) Run() {
 	}
 	// 输出区块链信息命令
 	if printChainCmd.Parsed() {
-		cli.printchain()
+		cli.printchain(nodeID)
 	}
 	// 创建区块链命令
 	if createBLCWithGenesisiBlockCmd.Parsed() {
@@ -167,7 +185,7 @@ func (cli *CLI) Run() {
 			PrintUsage()
 			os.Exit(1)
 		}
-		cli.createBlockChain(*flagCreateBlockChainArg)
+		cli.createBlockChain(*flagCreateBlockChainArg, nodeID)
 	}
 	//发起转账
 	if sendCmd.Parsed() {
@@ -184,6 +202,6 @@ func (cli *CLI) Run() {
 		//fmt.Printf("\tFROM:[%s]\n", *flagSendFromArg)
 		//fmt.Printf("\tTO:[%s]\n", *flagSendToArg)
 		//fmt.Printf("\tAMOUNT:[%s]\n", *flagSendAmountArg)
-		cli.send(JSON2Slice(*flagSendFromArg), JSON2Slice(*flagSendToArg), JSON2Slice(*flagSendAmountArg))
+		cli.send(JSON2Slice(*flagSendFromArg), JSON2Slice(*flagSendToArg), JSON2Slice(*flagSendAmountArg), nodeID)
 	}
 }

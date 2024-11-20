@@ -15,7 +15,7 @@ import (
 
 // 区块链文件管理
 // 数据库名称
-const dbName = "block.db"
+const dbName = "block%s.db"
 
 // 表名称
 const blockTableName = "blocks"
@@ -29,14 +29,16 @@ type BlockChain struct {
 // 判断数据库文件是否存在
 
 // CreateBlockChainWithGenesisBlock 初始化区块链
-func CreateBlockChainWithGenesisBlock(address string) *BlockChain {
-	if dbExist() {
+func CreateBlockChainWithGenesisBlock(address string, nodeID string) *BlockChain {
+	if dbExist(nodeID) {
 		fmt.Println("BlockChain already exists")
 		os.Exit(1)
 	}
 	// 生成创世区块
 	var blockHash []byte
 	// 1. 创建或打开一个数据库
+	//生成不同节点的数据库文件
+	dbName := fmt.Sprintf(dbName, nodeID)
 	db, err := bolt.Open(dbName, 0600, nil)
 	if err != nil {
 		log.Fatal(err)
@@ -78,7 +80,9 @@ func CreateBlockChainWithGenesisBlock(address string) *BlockChain {
 	return &BlockChain{db, blockHash}
 }
 
-func dbExist() bool {
+func dbExist(nodeID string) bool {
+	//生成不同节点的数据库文件
+	dbName := fmt.Sprintf(dbName, nodeID)
 	_, err := os.Stat(dbName)
 	if os.IsNotExist(err) {
 		return false
@@ -172,8 +176,10 @@ func (bc *BlockChain) PrintChain() {
 }
 
 // 获取一个blockchain对象
-func BlockchainObject() *BlockChain {
+func BlockchainObject(nodeID string) *BlockChain {
 	//获取DB
+	//生成不同节点的数据库文件
+	dbName := fmt.Sprintf(dbName, nodeID)
 	db, err := bolt.Open(dbName, 0600, nil)
 	if err != nil {
 		log.Panicf("open db [%s] failed %v\n", dbName, err)

@@ -57,7 +57,7 @@ func (proofOfWork *ProofOfWork) Run() ([]byte, int64) {
 
 // 生成准备数据的函数
 func (pow *ProofOfWork) prepareData(nonce int64) []byte {
-	//拼接区块属性，进行hash计算
+	// 拼接区块属性，进行hash计算
 	// 调用sha256实现hash生成
 	// 实现int->hash
 	timeStampBytes := Int64ToHex(pow.Block.TimeStamp)
@@ -70,8 +70,8 @@ func (pow *ProofOfWork) prepareData(nonce int64) []byte {
 		Int64ToHex(nonce),
 		Int64ToHex(targetBit),
 	}, []byte{})
-	hash := sha256.Sum256(data)
-	pow.Block.Hash = hash[:]
+	//hash := sha256.Sum256(data)
+	//pow.Block.Hash = hash[:]
 
 	return data
 }
