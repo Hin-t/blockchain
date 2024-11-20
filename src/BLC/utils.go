@@ -75,3 +75,14 @@ func commandToBytes(cmd string) []byte {
 	}
 	return bytes[:]
 }
+
+// 反解析，把请求中的命令解析出来
+func bytesToCommand(bytes []byte) string {
+	var command []byte
+	for _, b := range bytes {
+		if b != 0x00 {
+			command = append(command, b)
+		}
+	}
+	return fmt.Sprintf("%s", command)
+}
