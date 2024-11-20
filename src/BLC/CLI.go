@@ -86,7 +86,7 @@ func (cli *CLI) Run() {
 	flagSetPortArg := setPortCmd.String("port", "", "端口号")
 	// 判断命令
 	switch os.Args[1] {
-	case "port":
+	case "set_id":
 		if err := setPortCmd.Parse(os.Args[2:]); err != nil {
 			log.Panicf("parse cmd of set node id failed! %v\n", err)
 		}
@@ -130,7 +130,7 @@ func (cli *CLI) Run() {
 	}
 	//设置端口号
 	if setPortCmd.Parsed() {
-		if *flagSetPortArg != "" {
+		if *flagSetPortArg == "" {
 			fmt.Println("请输入要设置的端口号...")
 			//PrintUsage()
 			os.Exit(1)
